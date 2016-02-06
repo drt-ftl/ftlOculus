@@ -28,6 +28,7 @@ public class MakeMesh : MonoBehaviour
 
     public void ClearAll()
     {
+        GO = false;
         mesh.Clear();
         //mesh_b.Clear();
 
@@ -36,18 +37,17 @@ public class MakeMesh : MonoBehaviour
         normals.Clear();
         colors.Clear();
         uvs.Clear();
-
         //tris_b.Clear();
         //verts_b.Clear();
         //normals_b.Clear();
-        Min = new Vector3(1000, 1000, 1000);
-        Max = new Vector3(-1000, -1000, -1000);
+        Min = Vector3.one * 1000;
+        Max = Vector3.one * -1000;
     }
     public void Begin()
     {
         gameObject.transform.position = Vector3.zero;
-        Min = new Vector3(1000, 1000, 1000);
-        Max = new Vector3(-1000, -1000, -1000);
+        Min = Vector3.one * 1000;
+        Max = Vector3.one * -1000;
         if (gameObject.GetComponent<MeshFilter>() == null)
             gameObject.AddComponent<MeshFilter>();
         if (gameObject.GetComponent<MeshRenderer>() == null)
@@ -172,15 +172,9 @@ public class MakeMesh : MonoBehaviour
         //mesh_b.RecalculateNormals();
         //mesh_b.Optimize();
 
-
-        var fwPos = Vector3.zero;
-        fwPos.y = Screen.height / 2;
-        fwPos.z = 2.4f;
-        camScript.folderWindow.GetComponent<RectTransform>().localPosition = fwPos;
-        camScript.folderWindow.active = false;
-        fwPos.z = 0;
-        camScript.mainMenu.GetComponent<RectTransform>().localPosition = fwPos;
-        camScript.mainMenu.active = false;
+        
+        camScript.folderWindow.GetComponent<PanelFades>().FadeOut();
+        camScript.mainMenu.GetComponent<PanelFades>().FadeOut();
     }
 
     public Vector3[] GetTriangleVertices(int id)
@@ -219,7 +213,6 @@ public class MakeMesh : MonoBehaviour
     }
     public void ChangeMaterial(int selection)
     {
-        print(selection);
         GetComponent<MeshRenderer>().material = materials[selection];
     }
 

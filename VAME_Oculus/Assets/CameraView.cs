@@ -13,7 +13,9 @@ public class CameraView : MonoBehaviour
 	
 	void Update ()
     {
-        if (camScript.mainMenu.active)
+        if (camScript.mainMenu.GetComponent<PanelFades>().Visible() 
+            || camScript.folderWindow.GetComponent<PanelFades>().Visible() 
+            || camScript.sceneWindow.GetComponent<PanelFades>().Visible())
         {
             lastMp = Input.mousePosition;
             return;

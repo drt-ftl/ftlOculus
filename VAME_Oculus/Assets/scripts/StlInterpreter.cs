@@ -6,17 +6,19 @@ public class StlInterpreter
     private Vector3 Normal;
     public Vector3 Min { get; set; }
     public Vector3 Max { get; set; }
-    public Vector3 offsetSTL { get; set; }
 
     public void ClearAll()
     {
-        Min = new Vector3(1000, 1000, 1000);
-        Max = new Vector3(-1000, -1000, -1000);
+        camScript.currentVertices.Clear();
+        camScript.MM.ClearAll();
+        Min = Vector3.one * 1000;
+        Max = Vector3.one * -1000;
     }
     public Vector3 centroid
     {
         get
         {
+            
             var c = (Min + Max) / 2.0f;
             return c;
         }
@@ -24,8 +26,8 @@ public class StlInterpreter
 
     public StlInterpreter()
     {
-        Min = new Vector3(1000, 1000, 1000);
-        Max = new Vector3(-1000, -1000, -1000);
+        Min = Vector3.one * 1000;
+        Max = Vector3.one * -1000;
     }
 
     public void normal (string _line)

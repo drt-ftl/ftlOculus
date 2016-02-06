@@ -11,10 +11,11 @@ public class camScript : MonoBehaviour
     public Material Mat;
     public Dropdown materialDD;
     public Dropdown skyboxDD;
-    public Dropdown groundDD;
+    public Dropdown landscapeDD;
+    public Dropdown propDD;
 
     private GameObject _cursor;
-    private MakeMesh MM;
+    public static MakeMesh MM;
 
     public static GameObject mainMenu;
     public static GameObject folderWindow;
@@ -22,10 +23,14 @@ public class camScript : MonoBehaviour
     private List<List<GameObject>> fileButtons = new List<List<GameObject>>();
     private StlInterpreter stlInterpreter;
     public static List<Vector3> currentVertices = new List<Vector3>();
-    public static List<Vector3> vertices = new List<Vector3>();
     public static Vector3 Min = new Vector3(1000, 1000, 1000);
     public static Vector3 Max = new Vector3(-1000, -1000, -1000);
     public List<Material> skyboxes = new List<Material>();
+    public List<GameObject> landscapes = new List<GameObject>();
+    public List<GameObject> props = new List<GameObject>();
+    public static GameObject currentLandscape;
+    public static GameObject currentProp;
+    private float mouseYoffset = -7;
 
     void Start ()
     {
@@ -33,23 +38,72 @@ public class camScript : MonoBehaviour
         mainMenu = GameObject.Find("Main Menu");
         folderWindow = GameObject.Find("Folder Window");
         sceneWindow = GameObject.Find("Scene Window");
-        var fwPos = Vector3.zero;
-        fwPos.y = Screen.height / 2;
-        fwPos.z = 2.4f;
 
-        folderWindow.GetComponent<RectTransform>().localPosition = fwPos;
-        folderWindow.active = false;
-        sceneWindow.GetComponent<RectTransform>().localPosition = fwPos;
-        sceneWindow.active = false;
+        folderWindow.GetComponent<PanelFades>().FadeOut();
+        sceneWindow.GetComponent<PanelFades>().FadeOut();
         _cursor = Instantiate(cursor) as GameObject;
         _cursor.transform.SetParent(mainMenu.transform);
-        var pos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, 1));
+        var pos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y + mouseYoffset, -1f));
         var rot = new Quaternion(0, 0, 0, 0);
         _cursor.transform.localPosition = pos;
         _cursor.transform.localRotation = rot;
         MM = GameObject.Find("MESH").GetComponent<MakeMesh>();
         MM.material = Mat;
         MM.Begin();
+
+        for (int i = 0; i < landscapes.Count; i++)
+        {
+            var l = Instantiate(landscapes[i]);
+            l.name = landscapes[i].name;
+            l.active = false;
+            landscapes[i] = l;
+        }
+
+        for (int i = 0; i < props.Count; i++)
+        {
+            var p = Instantiate(props[i]);
+            p.name = props[i].name;
+            p.active = false;
+            props[i] = p;
+        }
+
+        var options = new List<Dropdown.OptionData>(skyboxes.Count);
+        foreach (var skybox in skyboxes)
+        {
+            var newOption = new Dropdown.OptionData(skybox.name);
+            options.Add(newOption);
+        }
+        skyboxDD.options = options;
+
+        options = new List<Dropdown.OptionData>(MM.materials.Count);
+        foreach (var mat in MM.materials)
+        {
+            var newOption = new Dropdown.OptionData(mat.name);
+            options.Add(newOption);
+        }
+        materialDD.options = options;
+
+        options = new List<Dropdown.OptionData>(landscapes.Count);
+        var none = new Dropdown.OptionData("None");
+        options.Add(none);
+        foreach (var landscape in landscapes)
+        {
+            var newOption = new Dropdown.OptionData(landscape.name);
+            options.Add(newOption);
+        }
+        landscapeDD.options = options;
+
+        options = new List<Dropdown.OptionData>(props.Count);
+        options.Add(none);
+        foreach (var prop in props)
+        {
+            var newOption = new Dropdown.OptionData(prop.name);
+            options.Add(newOption);
+        }
+        propDD.options = options;
+        currentProp = null;
+
+
 
         materialDD.onValueChanged.AddListener(delegate {
             MaterialDropdownValueChangedHandler(materialDD);
@@ -59,8 +113,12 @@ public class camScript : MonoBehaviour
             SkyboxDropdownValueChangedHandler(skyboxDD);
         });
 
-        groundDD.onValueChanged.AddListener(delegate {
-            GroundDropdownValueChangedHandler(groundDD);
+        landscapeDD.onValueChanged.AddListener(delegate {
+            LandscapeDropdownValueChangedHandler(landscapeDD);
+        });
+
+        propDD.onValueChanged.AddListener(delegate {
+            PropDropdownValueChangedHandler(propDD);
         });
     }
 
@@ -68,20 +126,15 @@ public class camScript : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Space))
             ShowPanel();
-        if (Input.GetKeyDown(KeyCode.F))
-        {
-            mainMenu.GetComponent<PanelFades>().FadeOut();
-        }
-        if (Input.GetKeyDown(KeyCode.G))
-        {
-            mainMenu.GetComponent<PanelFades>().FadeIn();
-        }
+        if (Input.GetKey(KeyCode.Escape))
+            Application.Quit();
     }
 
 	void OnGUI()
     {
+        
         _cursor.transform.SetParent(GameObject.Find("Canvas").transform);
-        var pos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, 0.93f));
+        var pos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y + mouseYoffset, 1.5f));
         var rot = new Quaternion(0, 0, 0, 0);
         _cursor.transform.position = pos;
         _cursor.transform.localRotation = rot;
@@ -89,10 +142,16 @@ public class camScript : MonoBehaviour
 
     void ShowPanel()
     {
-        if (mainMenu.active)
-            mainMenu.active = false;
+        if (mainMenu.GetComponent<PanelFades>().Visible() 
+            || folderWindow.GetComponent<PanelFades>().Visible() 
+            || sceneWindow.GetComponent<PanelFades>().Visible())
+        {
+            mainMenu.GetComponent<PanelFades>().FadeOut();
+            folderWindow.GetComponent<PanelFades>().FadeOut();
+            sceneWindow.GetComponent<PanelFades>().FadeOut();
+        }
         else
-            mainMenu.active = true;
+            mainMenu.GetComponent<PanelFades>().FadeIn();
     }
 
     void CursorControl()
@@ -102,23 +161,29 @@ public class camScript : MonoBehaviour
 
     public void browseFiles()
     {
-        folderWindow.active = true;
+        fileButtons.Clear();
+        folderWindow.GetComponent<PanelFades>().FadeIn();
         mainMenu.GetComponent<PanelFades>().FadeOut();
-        var filesPerPage = 5;
+        var filesPerPage = 7;
         var path = Application.dataPath + "/Models";
-        var filenames = Directory.GetFiles(path);
-        var numFiles = filenames.Length;
+        var filenamesArray = Directory.GetFiles(path);
+        var filenames = new List<string>();
+        foreach (var fna in filenamesArray)
+        {
+            if (fna.EndsWith(".STL") || fna.EndsWith(".stl"))
+                filenames.Add(fna);
+        }
+        var numFiles = filenames.Count;
         var numPages = Mathf.CeilToInt(numFiles / filesPerPage);
         for (int pgNum = 0; pgNum < numPages; pgNum++)
         {
             fileButtons.Add(new List<GameObject>());
             for (int i = (pgNum * filesPerPage); i < (pgNum * filesPerPage) + filesPerPage; i ++)
             {
-                if (i >= filenames.Length) return;
-                if (filenames[i].EndsWith(".meta")) continue;
+                if (i >= filenames.Count) return;
                 var newButton = Instantiate(button) as GameObject;
                 newButton.transform.SetParent(folderWindow.transform);
-                var pos = new Vector3(0, (i - pgNum * filesPerPage) * 30 + 30, 0);
+                var pos = new Vector3(0, (-i - (pgNum * filesPerPage - filesPerPage)) * 40 - 70, 0);
                 var rot = new Quaternion(0, 0, 0, 0);
                 newButton.transform.localPosition = pos;
                 newButton.transform.localScale = Vector3.one;
@@ -134,12 +199,13 @@ public class camScript : MonoBehaviour
         {
             f.active = true;
         }
-        folderWindow.GetComponent<PanelFades>().FadeIn();
     }
 
     public void loadFile(string fileName)
     {
+        stlInterpreter.ClearAll();
         var reader = new StreamReader(fileName);
+
         while (!reader.EndOfStream)
         {
             string line = reader.ReadLine();
@@ -174,9 +240,9 @@ public class camScript : MonoBehaviour
 
     public void EditScene()
     {
-        sceneWindow.active = true;
-        mainMenu.GetComponent<PanelFades>().FadeOut();
         sceneWindow.GetComponent<PanelFades>().FadeIn();
+        folderWindow.GetComponent<PanelFades>().FadeOut();
+        mainMenu.GetComponent<PanelFades>().FadeOut();
     }
 
     private void MaterialDropdownValueChangedHandler(Dropdown target)
@@ -186,11 +252,38 @@ public class camScript : MonoBehaviour
 
     private void SkyboxDropdownValueChangedHandler(Dropdown target)
     {
-        RenderSettings.skybox = skyboxes[target.value];
+        RenderSettings.skybox = skyboxes[target.value]; 
     }
 
-    private void GroundDropdownValueChangedHandler(Dropdown target)
+    private void LandscapeDropdownValueChangedHandler(Dropdown target)
     {
-        MM.ChangeMaterial(target.value);
+        var tmp = currentLandscape;
+        if (target.value == 0)
+        {
+            currentLandscape = null;
+        }
+        else
+        {
+            currentLandscape = landscapes[target.value - 1];
+            currentLandscape.active = true;
+        }
+        if (tmp != null)
+            tmp.active = false;
+    }
+
+    private void PropDropdownValueChangedHandler(Dropdown target)
+    {
+        var tmp = currentProp;
+        if (target.value == 0)
+        {
+            currentProp = null;
+        }
+        else
+        {
+            currentProp = props[target.value - 1];
+            currentProp.active = true;
+        }
+        if (tmp != null)
+            tmp.active = false;
     }
 }
